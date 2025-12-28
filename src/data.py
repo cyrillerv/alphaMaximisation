@@ -30,7 +30,12 @@ def load_histo_cac() :
 def load_stock_prices(tickers) :
     res = yf.download(tickers, period="max", interval="1d")
     stock_prices = res['Close']
-    stock_price_filtered = stock_prices.ffill().copy()
+    full_index = pd.date_range(
+        start=stock_prices.index.min(),
+        end=stock_prices.index.max(),
+        freq="D"
+    )
+    stock_price_filtered = stock_prices.reindex(full_index, method='ffill').copy()
     stock_returns = stock_price_filtered.pct_change().copy()
     stock_returns = stock_returns.iloc[1:]
     return stock_returns, stock_price_filtered
