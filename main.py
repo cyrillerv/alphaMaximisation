@@ -5,6 +5,7 @@ from tqdm import tqdm
 from src.data import load_histo_cac, load_stock_prices
 from src.optimization import optimize_single_period
 from src.execution import generate_transaction_log
+from src.utils import format_financial_report, save_single_graph
 from backtesting.core import BacktestEngine 
 
 WINDOW = 2 # in years
@@ -89,5 +90,29 @@ engine = BacktestEngine(
 )
 
 engine.run()
-engine.summary()
-engine.plot_graphs()
+metrics = pd.Series(engine.summary())
+df_report = format_financial_report(metrics)
+df_report.to_markdown(r'results\report.md', index=True)
+
+
+# 1. Les graphiques standards (toujours présents)
+graphs_to_save = {
+    "01_Cumulative_PnL": engine.cumulative_pnl_graph,
+    "02_Drawdown": engine.drawdown_graph,
+    "03_Returns_Dist": engine.returns_histogram,
+    "04_Hit_Ratio": engine.hit_ratio_pie,
+    "05_Volume_vs_Perf": engine.volume_vs_perf_scatter_plot
+}
+
+# 2. Ajout conditionnel : Benchmark & Régression
+if not engine.bench_df.empty:
+    graphs_to_save["06_Regression_Analysis"] = engine.fig_regression
+
+# 3. Ajout conditionnel : Analyse Sectorielle
+if engine.sector_mapping:  # Si le dictionnaire n'est pas vide
+    graphs_to_save["07_Sector_Exposure"] = engine.graph_sector_exposure
+    graphs_to_save["08_Allocation_Long"] = engine.allocation_sector_long
+    graphs_to_save["09_Allocation_Short"] = engine.allocation_sector_short
+
+for name, fig in graphs_to_save.items():
+    save_single_graph(fig, name)
