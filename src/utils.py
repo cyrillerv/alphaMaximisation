@@ -1,6 +1,40 @@
 import numpy as np
 import pandas as pd
 import os
+import logging
+import sys
+from pathlib import Path
+
+def config_logger(log_filename="backtest.log"):
+    log_path = Path(log_filename)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    root = logging.getLogger()
+    if root.handlers:
+        for handler in root.handlers[:]:
+            root.removeHandler(handler)
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    
+    logging.basicConfig(
+        level=logging.WARNING, 
+        handlers=[console_handler]
+    )
+
+    logger = logging.getLogger("MyStrategy")
+    logger.setLevel(logging.INFO)
+
+    file_handler = logging.FileHandler(log_filename, mode='a', encoding='utf-8')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+    
+    logger.addHandler(file_handler)
+
+    return logger
+
 
 def get_portfolio_returns(weights, stock_returns):
     return np.dot(stock_returns, weights)
