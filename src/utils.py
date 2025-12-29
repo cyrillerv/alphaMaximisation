@@ -4,6 +4,7 @@ import os
 import logging
 import sys
 from pathlib import Path
+import plotly.express as px
 
 def config_logger(log_filename="backtest.log"):
     log_path = Path(log_filename)
@@ -55,6 +56,11 @@ def get_alpha(weights, stock_returns, benchmark_returns):
     beta = covariance / variance_bench
     
     mean_ret_port = np.mean(port_returns) * 252
+    # vol_port = np.std(port_returns) * np.sqrt(252)
+    # if vol_port == 0:
+    #         return -np.inf
+    # sharpe_ratio = mean_ret_port / vol_port
+    # return sharpe_ratio
     mean_ret_bench = np.mean(benchmark_returns) * 252
     
     alpha = mean_ret_port - (beta * mean_ret_bench)
@@ -143,3 +149,36 @@ def save_single_graph(fig, name, folder_name="results"):
     safe_name = name.lower().replace(" ", "_")
     img_path = os.path.join(folder_name, f"{safe_name}.png")
     fig.write_image(img_path, width=1200, height=600, scale=2)
+
+
+
+def plot_calibration_results(sharpe_dict, robustness_range=None):
+    df_res = pd.DataFrame(list(sharpe_dict.items()), columns=['Window', 'Sharpe'])
+    df_res = df_res.sort_values('Window')
+
+    fig = px.line(
+        df_res, 
+        x='Window', 
+        y='Sharpe', 
+        title='Sharpe Ratio Sensitivity vs Lookback Window',
+        markers=True,
+        labels={'Window': 'Window (Months)', 'Sharpe': 'Sharpe Ratio'}
+    )
+
+    fig.update_layout(
+        xaxis=dict(tickmode='linear', dtick=1),
+        template='plotly_white',
+        hovermode='x unified'
+    )
+
+    if robustness_range:
+        fig.add_vrect(
+            x0=robustness_range[0], 
+            x1=robustness_range[1], 
+            fillcolor="green", opacity=0.15, 
+            layer="below", line_width=0,
+            annotation_text="Robustness Zone", 
+            annotation_position="top left"
+        )
+
+    return fig
