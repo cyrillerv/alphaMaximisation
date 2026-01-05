@@ -43,28 +43,28 @@ def get_portfolio_returns(weights, stock_returns):
 def get_portfolio_volatility(weights, cov_matrix):
     return np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
 
-def get_alpha(weights, stock_returns, benchmark_returns):
-    port_returns = np.dot(stock_returns, weights)
-    
-    cov_matrix = np.cov(port_returns, benchmark_returns)
-    covariance = cov_matrix[0, 1]
-    variance_bench = cov_matrix[1, 1]
-    
-    if variance_bench == 0:
-        return -np.inf
-        
-    beta = covariance / variance_bench
-    
-    mean_ret_port = np.mean(port_returns) * 252
-    # vol_port = np.std(port_returns) * np.sqrt(252)
-    # if vol_port == 0:
-    #         return -np.inf
-    # sharpe_ratio = mean_ret_port / vol_port
-    # return sharpe_ratio
-    mean_ret_bench = np.mean(benchmark_returns) * 252
-    
-    alpha = mean_ret_port - (beta * mean_ret_bench)
-    return alpha
+def prepare_alpha_terms(stock_returns, benchmark_returns):
+    """Function to do calc outside optimization function to save time."""
+    R = stock_returns.to_numpy()          # (T, N)
+    b = benchmark_returns.to_numpy()      # (T,)
+
+    mu_R = R.mean(axis=0)                 # (N,)
+    mu_b = b.mean()
+
+    cov_Rb = ((R - mu_R) * (b - mu_b)[:, None]).mean(axis=0)  # (N,)
+    var_b = np.var(b)
+
+    return mu_R, mu_b, cov_Rb, var_b
+
+def objective_maximize_alpha_fast(w, mu_R, mu_b, cov_Rb, var_b):
+    port_mean = w @ mu_R
+    beta = (w @ cov_Rb) / var_b
+    alpha = port_mean - beta * mu_b
+    return -alpha
+
+
+
+
 
 
 def format_financial_report(raw_metrics):
@@ -182,3 +182,9 @@ def plot_calibration_results(sharpe_dict, robustness_range=None):
         )
 
     return fig
+
+
+def obtenir_tickers_actifs(df, date_cible):
+    date_cible = pd.to_datetime(date_cible)
+    mask = (df['MbrStartDt'] <= date_cible) & (df['MbrEndDt'] >= date_cible)
+    return df.loc[mask, 'PERMNO'].drop_duplicates().to_list()

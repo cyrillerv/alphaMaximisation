@@ -1,16 +1,15 @@
 import pandas as pd
 import numpy as np
 from src.optimization import *
+from src.utils import obtenir_tickers_actifs
 
-def compute_weights_at_rebal_date(df_stocks_ret, histo_compo_cac, logger, bench_returns, UNIT, rebal_date, WINDOW, MAX_VOL) :
+def compute_weights_at_rebal_date(stock_prices, histo_compo_cac, logger, bench_returns, UNIT, rebal_date, WINDOW, MAX_VOL) :
     start_date_window = rebal_date - pd.DateOffset(**{UNIT: WINDOW})
     end_date_window = rebal_date    
-    stock_ret_window = df_stocks_ret.loc[start_date_window:end_date_window].copy()
 
     try:
         # Retrieve the composition of the CAC40 at the begining of the optimisation period
-        compo_at_date = histo_compo_cac.replace(0, np.nan).reindex([stock_ret_window.index.min()], method='ffill').T.dropna()
-        valid_tickers = compo_at_date.index.intersection(df_stocks_ret.columns)
+        valid_tickers = obtenir_tickers_actifs(histo_compo_cac, start_date_window)
     except Exception:
         logger.debug(f"Skipping {rebal_date.date()}: Not enough valid tickers ({len(valid_tickers)})")
         return {}
@@ -19,16 +18,24 @@ def compute_weights_at_rebal_date(df_stocks_ret, histo_compo_cac, logger, bench_
         logger.debug(f"Skipping {rebal_date.date()}: Not enough valid tickers ({len(valid_tickers)})")
         return {}
 
-    stock_ret_window = stock_ret_window[valid_tickers].dropna(axis=1)
+    stock_ret_window_long = stock_prices.loc[
+        (stock_prices['PERMNO'].isin(valid_tickers)) &
+        (stock_prices['date'] >= start_date_window) &
+        (stock_prices['date'] <= end_date_window)
+    ]
+    stock_ret_window = stock_ret_window_long.pivot_table(values="RET_calc", columns="PERMNO", index="date").fillna(0)
+    # print(stock_ret_window.head())
+
     bench_ret_window = bench_returns.loc[start_date_window:end_date_window].copy()
+    # print(bench_ret_window.head())
 
     if stock_ret_window.empty:
         logger.warning(f"No data for window ending {rebal_date.date()}")
         return {}
 
-    optimal_weights = optimize_single_period(
-        stock_ret_window.values, 
-        bench_ret_window.values, 
+    optimal_weights = optimize_single_period_gpu(
+        stock_ret_window, 
+        bench_ret_window, 
         max_volatility=MAX_VOL
     )
 

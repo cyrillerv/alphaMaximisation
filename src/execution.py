@@ -1,71 +1,47 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from tqdm import tqdm
 
-def generate_transaction_log(df_weights, df_prices, initial_capital=1_000_000):
-    # On s'assure que les prix sont remplis
-    prices_ffill = df_prices.ffill()
-    
-    # Alignement des dates : on ne garde que les dates de rebalancement présentes dans les prix
-    valid_dates = df_weights.index.intersection(prices_ffill.index)
-    df_weights = df_weights.loc[valid_dates]
-    
-    current_holdings = pd.Series(dtype=float)
-    cash = initial_capital
-    transactions = []
+def generate_transaction_log(df_weights_filtered, stock_prices, initial_cash, end_date_strat) :
+    cash = initial_cash
+    nb_stocks = {}
+    closing_dates = list(df_weights_filtered.index[1:]) + [end_date_strat]
+    all_transac = pd.DataFrame()
+    stock_prices.sort_values('date', inplace=True)
 
-    # On parcourt chaque date de rebalancement
-    for date in df_weights.index:
-        # 1. Valorisation du portefeuille actuel
-        current_prices = prices_ffill.loc[date]
+    for (_, rows), closing_date in zip(
+            tqdm(df_weights_filtered.iterrows()),
+            closing_dates
+        ):
+        date = rows.name
+        prices_date = stock_prices[stock_prices['date'] <= date].set_index('PERMNO')['PRC'].copy()
+        # D'abord on vend les positions qu'on a en portfolio
+        tickers_in_ptf = [ticker for ticker, volume in nb_stocks.items() if volume != 0]
+        price_date_stock = prices_date.loc[tickers_in_ptf].copy()
+        price_date_stock = price_date_stock[~price_date_stock.index.duplicated(keep='last')].to_dict()
+        result = sum([price_date_stock[k] * nb_stocks[k] for k in price_date_stock.keys() & nb_stocks.keys()])
+        cash += result
+        nb_stocks = {}
         
-        # Valeur des actions détenues
-        equity_value = 0
-        if not current_holdings.empty:
-            # On ne garde que les actifs qui ont un prix à cette date
-            valid_holdings = current_holdings.index.intersection(current_prices.index)
-            equity_value = (current_holdings[valid_holdings] * current_prices[valid_holdings]).sum()
-        
-        total_portfolio_value = cash + equity_value
-        
-        # 2. Calcul des nouvelles quantités cibles (Target)
-        target_weights = df_weights.loc[date]
-        target_weights = target_weights[target_weights > 0] # On ignore les poids nuls
-        
-        # Montant alloué par action
-        target_amounts = target_weights * total_portfolio_value
-        
-        # Quantité cible (division entière pour simuler des lots complets)
-        # On utilise .reindex pour gérer les actifs qui ne sont pas dans les prix (cas rare mais possible)
-        current_prices_subset = current_prices.loc[target_weights.index]
-        target_quantities = (target_amounts // current_prices_subset).fillna(0)
-        
-        # 3. Calcul des Deltas (Ordres à passer)
-        # On combine l'ancien et le nouveau portefeuille pour avoir tous les tickers
-        all_tickers = current_holdings.index.union(target_quantities.index)
-        
-        current_qty_aligned = current_holdings.reindex(all_tickers, fill_value=0)
-        target_qty_aligned = target_quantities.reindex(all_tickers, fill_value=0)
-        
-        order_quantities = target_qty_aligned - current_qty_aligned
-        
-        # 4. Enregistrement des transactions
-        for ticker, qty in order_quantities[order_quantities != 0].items():
-            direction = 'Buy' if qty > 0 else 'Sell'
-            
-            transactions.append({
-                'Date': date,
-                'Symbol': ticker,
-                'Type': direction,
-                'Volume': abs(qty)
-            })
-        
-        # 5. Mise à jour du portefeuille théorique pour la prochaine itération
-        # Note : Dans un backtest simple sans gestion précise du cash résiduel, 
-        # on considère que le portefeuille cible est atteint.
-        current_holdings = target_quantities[target_quantities > 0].copy()
-        
-        # Mise à jour du cash (le reste non investi à cause de la division entière)
-        invested_amount = (current_holdings * current_prices.loc[current_holdings.index]).sum()
-        cash = total_portfolio_value - invested_amount
+        # Puis on achète les nouvelles
+        filtered_row = rows[rows.ne(0)].copy()
+        price_date_stock = prices_date.loc[filtered_row.index].copy()
+        price_date_stock = price_date_stock[~price_date_stock.index.duplicated(keep='last')]
+        amt_per_stock = filtered_row * cash
+        volume_per_stock = (amt_per_stock // price_date_stock).replace(0, np.nan).dropna()
+        nb_stocks = volume_per_stock.to_dict()
 
-    return pd.DataFrame(transactions)
+        # On enlève au cash ce qu'on a dépensé
+        used_cash = (volume_per_stock * price_date_stock).sum()
+        cash -= used_cash
+
+        # Et on construit le df de transactions
+        transactions = volume_per_stock.rename('Volume').reset_index()
+        transactions.rename(columns={"index": "Symbol"}, inplace=True)
+        transactions['Date'] = date
+        transactions['Type'] = 'Buy'
+        transactions['ClosingDate'] = closing_date
+
+        all_transac = pd.concat([all_transac, transactions])
+    all_transac = all_transac[all_transac['Volume'].ne(0)].copy()
+    return all_transac
