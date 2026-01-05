@@ -10,6 +10,7 @@ def compute_weights_at_rebal_date(stock_prices, histo_compo_cac, logger, bench_r
     try:
         # Retrieve the composition of the CAC40 at the begining of the optimisation period
         valid_tickers = obtenir_tickers_actifs(histo_compo_cac, rebal_date)
+        valid_tickers.append('rf')
     except Exception:
         logger.debug(f"Skipping {rebal_date.date()}: Not enough valid tickers ({len(valid_tickers)})")
         return {}
@@ -24,10 +25,7 @@ def compute_weights_at_rebal_date(stock_prices, histo_compo_cac, logger, bench_r
         (stock_prices['date'] <= end_date_window)
     ]
     stock_ret_window = stock_ret_window_long.pivot_table(values="RET_calc", columns="PERMNO", index="date").fillna(0)
-    # print(stock_ret_window.head())
-
     bench_ret_window = bench_returns.loc[start_date_window:end_date_window].copy()
-    # print(bench_ret_window.head())
 
     if stock_ret_window.empty:
         logger.warning(f"No data for window ending {rebal_date.date()}")

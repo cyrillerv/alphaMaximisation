@@ -7,13 +7,11 @@ from src.workflow import run_rolling_backtest, compute_rebal_date
 from config import Config
 
 # TODO: continuer à clean le code
-# TODO: passer les print en log
 # TODO: dans le tableau comparatif mettre les data du benchmark
 # TODO: mettre le formatting dans la librairie backtesting
 # TODO: faire cross-validation pour ma strat
 # TODO: faire du volatility time management pour essayer de réduire la vol en baissant moins les returns pour booster sharp ratio
 # => cela pourrais définir notre date de rebal qui serait dynamique
-# TODO: corriger survivor bias
 # TODO: ajouter le rf asset
 # TODO: faire alpha against momentum
 
@@ -28,8 +26,27 @@ if __name__ == "__main__" :
     logger.info("Step1: Data Loadings")
     compo_universe = pd.read_csv(r"data\raw\compo_sp500_final.csv", parse_dates=['MbrStartDt', 'MbrEndDt'])
 
+
+    df_rf = pd.read_csv(r"data\raw\DGS1MO.csv", index_col=0, parse_dates=True, na_values=".")
+    df_rf = df_rf.ffill()
+    df_rf['DGS1MO'] = pd.to_numeric(df_rf['DGS1MO'])
+
+    df_rf['risk_free_return'] = (df_rf['DGS1MO'] / 100) / 252
+
+    df_rf['rf'] = (1 + df_rf['risk_free_return']).cumprod()
+    df_rf['rf'] = df_rf['rf'] / df_rf['rf'].iloc[0] * 100
+
+    df_long = df_rf[['rf']].reset_index()
+    df_long = df_long.melt(id_vars=df_long.columns[0], var_name='nom_colonne', value_name='valeur')
+    df_long.columns = ['date', 'PERMNO', 'PRC']
+
+
+
+
     path = r"data\raw\stock_prices_final.csv"
     stock_prices = pd.read_csv(path, parse_dates=['date'])
+    stock_prices = pd.concat([stock_prices, df_long])
+    
     stock_prices.sort_values("date", inplace=True) # S'assurer que tout est trié avant
     stock_prices['RET_calc'] = stock_prices.groupby("PERMNO")['PRC'].pct_change()
 
