@@ -9,7 +9,7 @@ def compute_weights_at_rebal_date(stock_prices, histo_compo_cac, logger, bench_r
 
     try:
         # Retrieve the composition of the CAC40 at the begining of the optimisation period
-        valid_tickers = obtenir_tickers_actifs(histo_compo_cac, start_date_window)
+        valid_tickers = obtenir_tickers_actifs(histo_compo_cac, rebal_date)
     except Exception:
         logger.debug(f"Skipping {rebal_date.date()}: Not enough valid tickers ({len(valid_tickers)})")
         return {}
