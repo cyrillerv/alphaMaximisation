@@ -50,15 +50,14 @@ def run_rolling_backtest(WINDOW_list, rebal_dates, stock_prices, histo_compo_cac
 
 
     logger.info("Generating transaction log...")
-    stock_prices.to_csv('stock_prices.csv')
-    df_weights_filtered.to_csv('df_weights_filtered.csv')
+    df_weights_filtered.to_csv(r'data\checkpoints\df_weights_filtered.csv')
     transaction_journal_bt = generate_transaction_log(
         df_weights_filtered, 
         stock_prices, 
         INITIAL_CAPITAL, 
         END_DATE_STRAT
         )
-    transaction_journal_bt.to_csv("transaction_journal.csv")
+    transaction_journal_bt.to_csv(r"data\checkpoints\transaction_journal.csv")
 
     logger.info("Starting Backtest")
     tickers_traded = transaction_journal_bt['Symbol'].drop_duplicates().dropna().to_list()
@@ -70,7 +69,7 @@ def run_rolling_backtest(WINDOW_list, rebal_dates, stock_prices, histo_compo_cac
         (stock_prices["date"] <= date_last_transac)
     ].copy()
     stock_prices_bt = stock_prices_long_bt.pivot_table(values="PRC", columns="PERMNO", index="date")
-    stock_prices_bt.to_csv('stock_prices.csv')
+    stock_prices_bt.to_csv(r'data\checkpoints\stock_prices.csv')
 
     # On reconstitue le prix d'un portfolio investit dans le benchmark
     bench_price = (bench_returns + 1).cumprod() - 1

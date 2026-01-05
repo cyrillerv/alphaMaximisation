@@ -23,7 +23,7 @@ if __name__ == "__main__" :
     logger.info("Step1: Data Loadings")
     histo_compo_cac = load_histo_cac()
     all_tickers = [conf.BENCHMARK] + list(histo_compo_cac.columns)
-    stock_returns, stock_prices = load_stock_prices(all_tickers)
+    stock_returns, stock_prices = load_stock_prices(all_tickers, univers=conf.BENCHMARK)
     stock_returns.dropna(subset=[conf.BENCHMARK], inplace=True)
 
 

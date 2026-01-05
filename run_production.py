@@ -26,9 +26,9 @@ if __name__ == "__main__" :
     logger.info('Running strat')
 
     logger.info("Step1: Data Loadings")
-    compo_universe = pd.read_csv("compo_sp500_final.csv", parse_dates=['MbrStartDt', 'MbrEndDt'])
+    compo_universe = pd.read_csv(r"data\raw\compo_sp500_final.csv", parse_dates=['MbrStartDt', 'MbrEndDt'])
 
-    path = "stock_prices_final.csv"
+    path = r"data\raw\stock_prices_final.csv"
     stock_prices = pd.read_csv(path, parse_dates=['date'])
     stock_prices.sort_values("date", inplace=True) # S'assurer que tout est trié avant
     stock_prices['RET_calc'] = stock_prices.groupby("PERMNO")['PRC'].pct_change()
@@ -38,7 +38,7 @@ if __name__ == "__main__" :
     compo_universe['PERMNO'] = compo_universe['PERMNO'].apply(str)
 
     df_fama = pd.read_csv(
-        "F-F_Research_Data_5_Factors_2x3_daily.csv", 
+        r"data\raw\F-F_Research_Data_5_Factors_2x3_daily.csv", 
         skiprows=3, 
         skipfooter=1, 
         sep=",", 
@@ -47,7 +47,7 @@ if __name__ == "__main__" :
         engine='python'
         )
     df_mom = pd.read_csv(
-        "F-F_Momentum_Factor_daily.csv", 
+        r"data\raw\F-F_Momentum_Factor_daily.csv", 
         skiprows=12, 
         skipfooter=1, 
         sep=",", 
